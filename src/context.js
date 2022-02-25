@@ -1,5 +1,6 @@
 import React, { Component } from "react";
-import items from "./data";
+// import items from "./data";
+import Client from "./contentful";
 
 const RoomContext = React.createContext();
 
@@ -24,22 +25,33 @@ class RoomProvider extends Component {
 
   // getData
 
-  componentDidMount() {
-    // this.getData
-    let rooms = this.formatData(items);
-    let featuredRooms = rooms.filter((room) => room.featured === true);
-    let maxPrice = Math.max(...rooms.map((item) => item.price));
-    let maxSize = Math.max(...rooms.map((item) => item.size));
+  getData = async () => {
+    try {
+      let response = await Client.getEntries({
+        content_type: "hotelBooking",
+        order: "fields.price",
+      });
+      let rooms = this.formatData(response.items);
+      let featuredRooms = rooms.filter((room) => room.featured === true);
+      let maxPrice = Math.max(...rooms.map((item) => item.price));
+      let maxSize = Math.max(...rooms.map((item) => item.size));
 
-    this.setState({
-      rooms,
-      featuredRooms,
-      sortedRooms: rooms,
-      loading: false,
-      price: maxPrice,
-      maxPrice,
-      maxSize,
-    });
+      this.setState({
+        rooms,
+        featuredRooms,
+        sortedRooms: rooms,
+        loading: false,
+        price: maxPrice,
+        maxPrice,
+        maxSize,
+      });
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  componentDidMount() {
+    this.getData();
   }
 
   formatData(items) {
@@ -60,14 +72,67 @@ class RoomProvider extends Component {
   };
 
   handleChange = (event) => {
-    const type = event.target.type;
+    const target = event.target;
+    const value = target.type === "checkbox" ? target.checked : target.value;
     const name = event.target.name;
-    const value = event.target.value;
-    console.log(type, name, value);
+    this.setState(
+      {
+        [name]: value,
+      },
+      this.filterRooms
+    );
+
+    // const type = event.target.type;
+    // const name = event.target.name;
+    // const value = event.target.value;
+    // // used to demonstrate what is returned from each of the event methods
+    // console.log(
+    //   `this is type: ${type}, this is  name: ${name}, this is value: ${value}`
+    // );
   };
 
   filterRooms = () => {
-    console.log("hello");
+    let { rooms, type, capacity, price, minSize, maxSize, breakfast, pets } =
+      this.state;
+
+    // all the rooms
+    let tempRooms = [...rooms];
+    // transform values
+    capacity = parseInt(capacity);
+    price = parseInt(price);
+
+    // filter by type
+    if (type !== "all") {
+      tempRooms = tempRooms.filter((room) => room.type === type);
+    }
+
+    // filter by capacity
+    if (capacity !== 1) {
+      tempRooms = tempRooms.filter((room) => room.capacity >= capacity);
+    }
+
+    // filter by price
+    tempRooms = tempRooms.filter((room) => room.price <= price);
+
+    // filter by size
+    tempRooms = tempRooms.filter(
+      (room) => room.size >= minSize && room.size <= maxSize
+    );
+
+    // filter breakfast
+    if (breakfast) {
+      tempRooms = tempRooms.filter((room) => room.breakfast === true);
+    }
+
+    // filter pets
+    if (pets) {
+      tempRooms = tempRooms.filter((room) => room.pets === true);
+    }
+
+    // change state
+    this.setState({
+      sortedRooms: tempRooms,
+    });
   };
 
   render() {
